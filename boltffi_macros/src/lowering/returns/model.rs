@@ -5,6 +5,7 @@ pub use boltffi_ffi_rules::transport::{
 };
 use syn::{ReturnType, Type};
 
+use crate::index::class_types::ClassTypeRegistry;
 use crate::index::custom_types::CustomTypeRegistry;
 use crate::index::data_types::DataTypeRegistry;
 use crate::lowering::transport::NamedTypeTransportClassifier;
@@ -62,6 +63,13 @@ impl ResolvedReturn {
         )
     }
 
+    pub fn is_object_handle(&self) -> bool {
+        matches!(
+            self.return_contract.value_strategy(),
+            ValueReturnStrategy::ObjectHandle
+        )
+    }
+
     pub fn value_return_method(
         &self,
         context: ReturnInvocationContext,
@@ -84,13 +92,19 @@ impl ResolvedReturn {
 pub struct ReturnLoweringContext<'a> {
     custom_types: &'a CustomTypeRegistry,
     data_types: &'a DataTypeRegistry,
+    class_types: &'a ClassTypeRegistry,
 }
 
 impl<'a> ReturnLoweringContext<'a> {
-    pub fn new(custom_types: &'a CustomTypeRegistry, data_types: &'a DataTypeRegistry) -> Self {
+    pub fn new(
+        custom_types: &'a CustomTypeRegistry,
+        data_types: &'a DataTypeRegistry,
+        class_types: &'a ClassTypeRegistry,
+    ) -> Self {
         Self {
             custom_types,
             data_types,
+            class_types,
         }
     }
 
@@ -100,6 +114,10 @@ impl<'a> ReturnLoweringContext<'a> {
 
     pub fn data_types(&self) -> &'a DataTypeRegistry {
         self.data_types
+    }
+
+    pub fn class_types(&self) -> &'a ClassTypeRegistry {
+        self.class_types
     }
 
     pub(crate) fn named_type_transport_classifier(&self) -> NamedTypeTransportClassifier<'a> {

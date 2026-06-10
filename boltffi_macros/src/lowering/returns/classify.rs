@@ -95,6 +95,10 @@ pub fn classify_value_return_strategy(
             }
         }
         RustTypeShape::NamedNominal | RustTypeShape::GenericNominal | RustTypeShape::Other => {
+            if return_lowering.class_types().contains(rust_type) {
+                return ValueReturnStrategy::ObjectHandle;
+            }
+
             match return_lowering
                 .named_type_transport_classifier()
                 .classify_named_type_transport(rust_type)

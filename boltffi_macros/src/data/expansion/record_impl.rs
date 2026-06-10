@@ -124,7 +124,8 @@ impl RecordImplExpansion {
         let custom_types = Box::leak(Box::new(crate_index.custom_types().clone()));
         let callback_registry = crate_index.callback_traits().clone();
         let data_types = Box::leak(Box::new(crate_index.data_types().clone()));
-        let return_lowering = ReturnLoweringContext::new(custom_types, data_types);
+        let class_types = Box::leak(Box::new(crate_index.class_types().clone()));
+        let return_lowering = ReturnLoweringContext::new(custom_types, data_types, class_types);
         let record_name = type_name.to_string();
 
         Ok(Self {
@@ -634,6 +635,7 @@ pub fn data_impl_block(item: TokenStream) -> TokenStream {
 mod tests {
     use super::*;
     use crate::index::callback_traits::CallbackTraitRegistry;
+    use crate::index::class_types::ClassTypeRegistry;
     use crate::index::custom_types::CustomTypeRegistry;
     use crate::index::data_types::{DataTypeCategory, DataTypeRegistry};
     use crate::lowering::returns::model::ReturnLoweringContext;
@@ -648,7 +650,8 @@ mod tests {
             ("UserProfile", DataTypeCategory::WireEncoded),
             ("Filter", DataTypeCategory::WireEncoded),
         ])));
-        ReturnLoweringContext::new(custom_types, data_types)
+        let class_types = Box::leak(Box::new(ClassTypeRegistry::default()));
+        ReturnLoweringContext::new(custom_types, data_types, class_types)
     }
 
     fn callback_registry() -> &'static CallbackTraitRegistry {

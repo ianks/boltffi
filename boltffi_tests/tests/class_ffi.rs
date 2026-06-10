@@ -85,6 +85,38 @@ mod ref_mut_self_methods {
     }
 }
 
+mod object_handle_returns {
+    use super::*;
+
+    #[test]
+    fn instance_method_returns_single_threaded_class_handle() {
+        let map = boltffi_fixture_map_new();
+        let marker =
+            unsafe { boltffi_fixture_map_add_marker(map, FixtureMarkerOptions { id: 64 }) };
+
+        assert!(!marker.is_null());
+        assert_eq!(unsafe { boltffi_fixture_marker_id(marker) }, 64);
+
+        unsafe {
+            boltffi_fixture_marker_free(marker);
+            boltffi_fixture_map_free(map);
+        }
+    }
+
+    #[test]
+    fn static_method_returns_single_threaded_class_handle() {
+        let marker =
+            unsafe { boltffi_fixture_map_default_marker(FixtureMarkerOptions { id: 128 }) };
+
+        assert!(!marker.is_null());
+        assert_eq!(unsafe { boltffi_fixture_marker_id(marker) }, 128);
+
+        unsafe {
+            boltffi_fixture_marker_free(marker);
+        }
+    }
+}
+
 mod async_ref_self_methods {
     use super::*;
 

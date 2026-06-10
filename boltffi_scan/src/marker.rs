@@ -69,7 +69,7 @@ impl Marker {
         match marker_name(attr).as_deref() {
             Some("data") => Self::from_data(attr).map(Some),
             Some("error") => Self::empty(attr, Self::Error).map(Some),
-            Some("export") => Self::empty(attr, Self::Export).map(Some),
+            Some("export") => Self::from_export(attr).map(Some),
             Some("skip") => Self::empty(attr, Self::Skip).map(Some),
             _ => Ok(None),
         }
@@ -92,11 +92,35 @@ impl Marker {
             _ => Err(invalid(attr)),
         }
     }
+
+    fn from_export(attr: &syn::Attribute) -> Result<Self, ScanError> {
+        match &attr.meta {
+            syn::Meta::Path(_) => Ok(Self::Export),
+            syn::Meta::List(list) => parse_export_args
+                .parse2(list.tokens.clone())
+                .map(|_| Self::Export)
+                .map_err(|_| invalid(attr)),
+            _ => Err(invalid(attr)),
+        }
+    }
 }
 
 fn parse_data_impl(input: syn::parse::ParseStream<'_>) -> syn::Result<()> {
     input.parse::<syn::Token![impl]>()?;
     Ok(())
+}
+
+fn parse_export_args(input: syn::parse::ParseStream<'_>) -> syn::Result<()> {
+    let args = syn::punctuated::Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated(input)?;
+    if !args.is_empty()
+        && args
+            .iter()
+            .all(|ident| ident == "single_threaded" || ident == "thread_unsafe")
+    {
+        Ok(())
+    } else {
+        Err(input.error("unsupported export marker arguments"))
+    }
 }
 
 fn marker_name(attr: &syn::Attribute) -> Option<String> {
@@ -243,6 +267,18 @@ mod tests {
         assert_eq!(Marker::detect(&fn_attrs("fn f() {}")), Ok(None));
         assert_eq!(
             Marker::detect(&const_attrs("#[export] const ANSWER: u32 = 42;")),
+            Ok(Some(Marker::Export))
+        );
+    }
+
+    #[test]
+    fn detects_export_with_class_threading_marker() {
+        assert_eq!(
+            Marker::detect(&impl_attrs("#[export(single_threaded)] impl S {}")),
+            Ok(Some(Marker::Export))
+        );
+        assert_eq!(
+            Marker::detect(&impl_attrs("#[boltffi::export(thread_unsafe)] impl S {}")),
             Ok(Some(Marker::Export))
         );
     }

@@ -6,6 +6,7 @@ pub(crate) mod model;
 mod tests {
     use super::classify::classify_value_return_strategy;
     use super::model::{ResolvedReturn, WasmOptionScalarEncoding};
+    use crate::index::class_types::ClassTypeRegistry;
     use crate::index::custom_types::CustomTypeRegistry;
     use crate::index::data_types::DataTypeRegistry;
     use crate::lowering::returns::model::ReturnLoweringContext;
@@ -19,7 +20,8 @@ mod tests {
         custom_types: &'a CustomTypeRegistry,
         data_types: &'a DataTypeRegistry,
     ) -> ReturnLoweringContext<'a> {
-        ReturnLoweringContext::new(custom_types, data_types)
+        let class_types = Box::leak(Box::new(ClassTypeRegistry::default()));
+        ReturnLoweringContext::new(custom_types, data_types, class_types)
     }
 
     #[test]
@@ -75,6 +77,30 @@ mod tests {
             strategy,
             ValueReturnStrategy::Buffer(EncodedReturnStrategy::OptionScalar)
         );
+    }
+
+    #[test]
+    fn exported_class_return_uses_object_handle_strategy() {
+        let custom_types = CustomTypeRegistry::default();
+        let data_types = DataTypeRegistry::default();
+        let class_types = ClassTypeRegistry::with_entries(&["Marker"]);
+        let context = ReturnLoweringContext::new(&custom_types, &data_types, &class_types);
+
+        let strategy = classify_value_return_strategy(&parse_quote!(Marker), &context);
+
+        assert_eq!(strategy, ValueReturnStrategy::ObjectHandle);
+    }
+
+    #[test]
+    fn qualified_exported_class_return_uses_object_handle_strategy() {
+        let custom_types = CustomTypeRegistry::default();
+        let data_types = DataTypeRegistry::default();
+        let class_types = ClassTypeRegistry::with_entries(&["map::Marker"]);
+        let context = ReturnLoweringContext::new(&custom_types, &data_types, &class_types);
+
+        let strategy = classify_value_return_strategy(&parse_quote!(crate::map::Marker), &context);
+
+        assert_eq!(strategy, ValueReturnStrategy::ObjectHandle);
     }
 
     #[test]

@@ -65,7 +65,8 @@ fn expand_ffi_trait(item_trait: syn::ItemTrait) -> Result<proc_macro2::TokenStre
     let crate_index = CrateIndex::for_current_crate()?;
     let custom_types = crate_index.custom_types().clone();
     let data_types = crate_index.data_types().clone();
-    let return_lowering = ReturnLoweringContext::new(&custom_types, &data_types);
+    let class_types = crate_index.class_types().clone();
+    let return_lowering = ReturnLoweringContext::new(&custom_types, &data_types, &class_types);
     let trait_name = &item_trait.ident;
     let trait_name_snake = snake_case_ident(trait_name);
     let vtable_name = syn::Ident::new(&format!("{}VTable", trait_name), trait_name.span());

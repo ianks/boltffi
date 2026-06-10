@@ -1,7 +1,8 @@
 use boltffi_ast::PackageInfo;
 use boltffi_binding::{
-    Bindings, ClassDecl, ConstantDecl, ConstantValueDecl, Decl, DefaultValue, IncomingParam,
-    IntegerValue, Native, ParamPlan, Primitive, Receive, RecordDecl, ReturnPlan, TypeRef, lower,
+    Bindings, ClassDecl, ConstantDecl, ConstantValueDecl, Decl, DefaultValue, HandlePresence,
+    HandleTarget, IncomingParam, IntegerValue, Native, ParamPlan, Primitive, Receive, RecordDecl,
+    ReturnPlan, TypeRef, lower,
 };
 use boltffi_scan::scan_file;
 
@@ -55,6 +56,19 @@ const SOURCE: &str = "
         }
 
         pub fn start(&mut self) {}
+
+        pub fn add_marker(&self) -> Marker {
+            todo!()
+        }
+    }
+
+    pub struct Marker;
+
+    #[export(single_threaded)]
+    impl Marker {
+        pub fn id(&self) -> u64 {
+            todo!()
+        }
     }
 
     #[export]
@@ -103,6 +117,17 @@ fn constant<'a>(bindings: &'a Bindings<Native>, name: &str) -> &'a ConstantDecl<
         .expect("constant declaration")
 }
 
+fn class<'a>(bindings: &'a Bindings<Native>, name: &str) -> &'a ClassDecl<Native> {
+    bindings
+        .decls()
+        .iter()
+        .find_map(|decl| match decl {
+            Decl::Class(class) if class.name().as_path_string() == name => Some(class.as_ref()),
+            _ => None,
+        })
+        .expect("class declaration")
+}
+
 #[test]
 fn scans_and_lowers_point_contract_to_bindings() {
     let file = syn::parse_str(SOURCE).expect("parse source fixture");
@@ -142,7 +167,7 @@ fn scans_and_lowers_point_contract_to_bindings() {
     assert_eq!(records, 1, "Point lowers to one record");
     assert_eq!(functions, 3, "functions lower from scanned exports");
     assert_eq!(callbacks, 1, "ValueCallback lowers to one callback");
-    assert_eq!(classes, 1, "Engine lowers to one class");
+    assert_eq!(classes, 2, "Engine and Marker lower to classes");
     assert_eq!(constants, 2, "exported constants lower to constants");
     assert_eq!(customs, 1, "custom types lower from scanned macros");
 
@@ -157,22 +182,29 @@ fn scans_and_lowers_point_contract_to_bindings() {
 
     assert_eq!(record_method_counts(record), (1, 1));
 
-    let class = bindings
-        .decls()
-        .iter()
-        .find_map(|decl| match decl {
-            Decl::Class(class) => Some(class.as_ref()),
-            _ => None,
-        })
-        .expect("class declaration");
+    let engine = class(&bindings, "engine");
+    let marker = class(&bindings, "marker");
 
-    assert_eq!(class_method_counts(class), (1, 1));
-    assert_eq!(class.initializers()[0].name().as_path_string(), "new");
-    assert_eq!(class.methods()[0].name().as_path_string(), "start");
+    assert_eq!(class_method_counts(engine), (1, 2));
+    assert_eq!(engine.initializers()[0].name().as_path_string(), "new");
+    assert_eq!(engine.methods()[0].name().as_path_string(), "start");
     assert_eq!(
-        class.methods()[0].callable().receiver(),
+        engine.methods()[0].callable().receiver(),
         Some(Receive::ByMutRef)
     );
+    assert_eq!(engine.methods()[1].name().as_path_string(), "add::marker");
+    assert_eq!(
+        engine.methods()[1].callable().receiver(),
+        Some(Receive::ByRef)
+    );
+    match engine.methods()[1].callable().returns().plan() {
+        ReturnPlan::HandleViaReturnSlot {
+            target: HandleTarget::Class(class_id),
+            presence: HandlePresence::Required,
+            ..
+        } => assert_eq!(class_id, &marker.id()),
+        other => panic!("expected required marker handle return, got {other:?}"),
+    }
 
     match constant(&bindings, "default::limit").value() {
         ConstantValueDecl::Inline { ty, value, .. } => {

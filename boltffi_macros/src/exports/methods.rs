@@ -461,7 +461,8 @@ pub fn ffi_class_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     let custom_types = crate_index.custom_types().clone();
     let callback_registry = crate_index.callback_traits().clone();
     let data_types = crate_index.data_types().clone();
-    let return_lowering = ReturnLoweringContext::new(&custom_types, &data_types);
+    let class_types = crate_index.class_types().clone();
+    let return_lowering = ReturnLoweringContext::new(&custom_types, &data_types, &class_types);
 
     let type_name = match impl_type_name(&input) {
         Some(name) => name,
@@ -891,6 +892,19 @@ fn generate_sync_method_export(
         };
         let return_type = quote! { -> <#rust_type as ::boltffi::__private::Passable>::Out };
         (body, return_type, false)
+    } else if return_abi.is_object_handle() {
+        let rust_type = return_abi.rust_type();
+        let body = if has_conversions {
+            quote! {
+                #(#conversions)*
+                Box::into_raw(Box::new(#call_expr))
+            }
+        } else {
+            quote! {
+                Box::into_raw(Box::new(#call_expr))
+            }
+        };
+        (body, quote! { -> *mut #rust_type }, false)
     } else {
         unreachable!(
             "unsupported instance method return strategy: {:?}",
@@ -1183,6 +1197,19 @@ fn generate_static_method_export(
         };
         let return_type = quote! { -> <#rust_type as ::boltffi::__private::Passable>::Out };
         (body, return_type, false)
+    } else if return_abi.is_object_handle() {
+        let rust_type = return_abi.rust_type();
+        let body = if has_conversions {
+            quote! {
+                #(#conversions)*
+                Box::into_raw(Box::new(#call_expr))
+            }
+        } else {
+            quote! {
+                Box::into_raw(Box::new(#call_expr))
+            }
+        };
+        (body, quote! { -> *mut #rust_type }, false)
     } else {
         unreachable!(
             "unsupported static method return strategy: {:?}",
@@ -1502,6 +1529,7 @@ fn generate_stream_exports(
 mod tests {
     use super::*;
     use crate::index::callback_traits::CallbackTraitRegistry;
+    use crate::index::class_types::ClassTypeRegistry;
     use crate::index::custom_types::CustomTypeRegistry;
     use crate::index::data_types::{DataTypeCategory, DataTypeRegistry};
     use crate::lowering::returns::model::ReturnLoweringContext;
@@ -1516,7 +1544,15 @@ mod tests {
             ("UserProfile", DataTypeCategory::WireEncoded),
             ("Filter", DataTypeCategory::WireEncoded),
         ])));
-        ReturnLoweringContext::new(custom_types, data_types)
+        let class_types = Box::leak(Box::new(ClassTypeRegistry::default()));
+        ReturnLoweringContext::new(custom_types, data_types, class_types)
+    }
+
+    fn class_return_lowering() -> ReturnLoweringContext<'static> {
+        let custom_types = Box::leak(Box::new(CustomTypeRegistry::default()));
+        let data_types = Box::leak(Box::new(DataTypeRegistry::default()));
+        let class_types = Box::leak(Box::new(ClassTypeRegistry::with_entries(&["Marker"])));
+        ReturnLoweringContext::new(custom_types, data_types, class_types)
     }
 
     fn callback_registry() -> &'static CallbackTraitRegistry {
@@ -1817,6 +1853,78 @@ mod tests {
         assert!(generated.contains("let filter = & filter_storage"));
         assert!(!generated.contains("profile : & UserProfile"));
         assert!(!generated.contains("filter : & Filter"));
+    }
+
+    #[test]
+    fn instance_method_returning_exported_class_lowers_to_object_handle() {
+        let impl_block = parse_impl(
+            r#"
+            impl Map {
+                pub fn add_marker(&self) -> Marker {
+                    Marker
+                }
+            }
+            "#,
+        );
+        let method = impl_block
+            .items
+            .iter()
+            .find_map(|item| match item {
+                syn::ImplItem::Fn(method) => Some(method),
+                _ => None,
+            })
+            .expect("instance method should exist");
+        let type_name = impl_type_name(&impl_block).expect("impl type name should resolve");
+
+        let generated = generate_sync_method_export(
+            MethodCallable::new(method),
+            &type_name,
+            "Map",
+            &class_return_lowering(),
+            callback_registry(),
+        )
+        .expect("instance export should be generated")
+        .to_string();
+
+        assert!(generated.contains("-> * mut Marker"));
+        assert!(generated.contains("Box :: into_raw (Box :: new ((* handle) . add_marker ()))"));
+        assert!(!generated.contains("FfiBuf :: wire_encode"));
+    }
+
+    #[test]
+    fn static_method_returning_exported_class_lowers_to_object_handle() {
+        let impl_block = parse_impl(
+            r#"
+            impl Map {
+                pub fn default_marker() -> Marker {
+                    Marker
+                }
+            }
+            "#,
+        );
+        let method = impl_block
+            .items
+            .iter()
+            .find_map(|item| match item {
+                syn::ImplItem::Fn(method) => Some(method),
+                _ => None,
+            })
+            .expect("static method should exist");
+        let type_name = impl_type_name(&impl_block).expect("impl type name should resolve");
+
+        let generated = generate_sync_method_export(
+            MethodCallable::new(method),
+            &type_name,
+            "Map",
+            &class_return_lowering(),
+            callback_registry(),
+        )
+        .expect("static export should be generated")
+        .to_string();
+
+        assert!(generated.contains("-> * mut Marker"));
+        assert!(generated.contains("Box :: into_raw (Box :: new (Map :: default_marker ()))"));
+        assert!(!generated.contains("FfiBuf :: wire_encode"));
     }
 
     #[test]

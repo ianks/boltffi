@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use syn::{Item, ItemEnum, ItemStruct, Type};
 
 use crate::data::analysis::{EnumDataShape, StructDataShape};
+use crate::index::type_paths::TypePathKey;
 use crate::index::{CrateIndex, SourceModule};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,10 +23,6 @@ impl DataTypeCategory {
 pub struct DataTypeRegistry {
     categories_by_path: HashMap<Vec<String>, DataTypeCategory>,
     unique_name_categories: HashMap<String, DataTypeCategory>,
-}
-
-struct TypePathKey {
-    segments: Vec<String>,
 }
 
 impl DataTypeRegistry {
@@ -59,16 +56,15 @@ impl DataTypeRegistry {
 
     pub fn category_for(&self, ty: &Type) -> Option<DataTypeCategory> {
         let type_path_key = TypePathKey::from_type(ty)?;
-        if type_path_key.segments.len() == 1 {
+        if type_path_key.is_single_segment() {
             return type_path_key
-                .segments
-                .first()
+                .first_segment()
                 .and_then(|name| self.unique_name_categories.get(name).copied());
         }
 
         if let Some(category) = self
             .categories_by_path
-            .get(&type_path_key.segments)
+            .get(type_path_key.segments())
             .copied()
         {
             return Some(category);
@@ -176,29 +172,6 @@ impl<'a> DataTypeCollector<'a> {
         let mut qualified_path = self.module_path.clone();
         qualified_path.push(item_enum.ident.to_string());
         self.registry.insert(qualified_path, category);
-    }
-}
-
-impl TypePathKey {
-    fn from_type(ty: &Type) -> Option<Self> {
-        match ty {
-            Type::Path(type_path) if type_path.qself.is_none() => Some(Self {
-                segments: type_path
-                    .path
-                    .segments
-                    .iter()
-                    .map(|segment| segment.ident.to_string())
-                    .collect(),
-            }),
-            Type::Group(group) => Self::from_type(group.elem.as_ref()),
-            Type::Paren(paren) => Self::from_type(paren.elem.as_ref()),
-            _ => None,
-        }
-    }
-
-    fn has_suffix(&self, suffix: &[String]) -> bool {
-        self.segments.len() >= suffix.len()
-            && self.segments[self.segments.len() - suffix.len()..] == *suffix
     }
 }
 

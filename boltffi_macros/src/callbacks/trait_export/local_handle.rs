@@ -723,6 +723,7 @@ struct LocalHandleParam {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::index::class_types::ClassTypeRegistry;
     use crate::index::custom_types::CustomTypeRegistry;
     use crate::index::data_types::DataTypeRegistry;
     use crate::lowering::returns::model::ReturnLoweringContext;
@@ -732,7 +733,8 @@ mod tests {
     fn return_lowering() -> ReturnLoweringContext<'static> {
         let custom_types = Box::leak(Box::new(CustomTypeRegistry::default()));
         let data_types = Box::leak(Box::new(DataTypeRegistry::default()));
-        ReturnLoweringContext::new(custom_types, data_types)
+        let class_types = Box::leak(Box::new(ClassTypeRegistry::default()));
+        ReturnLoweringContext::new(custom_types, data_types, class_types)
     }
 
     fn local_handle_method_expander(

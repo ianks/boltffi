@@ -39,6 +39,12 @@ pub struct FixtureStringConfig {
     pub source: String,
 }
 
+#[data]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct FixtureMarkerOptions {
+    pub id: i32,
+}
+
 #[export]
 pub trait SyncValueCallback {
     fn on_value(&self, value: i32) -> i32;
@@ -641,6 +647,35 @@ impl ThreadSafeCounter {
 
     pub fn increment(&self) -> i32 {
         self.add(1)
+    }
+}
+
+pub struct FixtureMarker {
+    id: i32,
+}
+
+#[export(single_threaded)]
+impl FixtureMarker {
+    pub fn id(&self) -> i32 {
+        self.id
+    }
+}
+
+#[derive(Default)]
+pub struct FixtureMap;
+
+#[export(single_threaded)]
+impl FixtureMap {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn add_marker(&self, options: FixtureMarkerOptions) -> FixtureMarker {
+        FixtureMarker { id: options.id }
+    }
+
+    pub fn default_marker(options: FixtureMarkerOptions) -> FixtureMarker {
+        FixtureMarker { id: options.id }
     }
 }
 

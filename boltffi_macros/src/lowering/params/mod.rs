@@ -384,6 +384,7 @@ pub fn transform_method_params_async(
 mod tests {
     use super::AsyncParamLowerer;
     use crate::index::callback_traits::CallbackTraitRegistry;
+    use crate::index::class_types::ClassTypeRegistry;
     use crate::index::custom_types::CustomTypeRegistry;
     use crate::index::data_types::DataTypeRegistry;
     use crate::lowering::returns::model::ReturnLoweringContext;
@@ -392,9 +393,11 @@ mod tests {
     fn async_param_lowerer() -> AsyncParamLowerer<'static> {
         let custom_types = Box::leak(Box::new(CustomTypeRegistry::default()));
         let data_types = Box::leak(Box::new(DataTypeRegistry::default()));
+        let class_types = Box::leak(Box::new(ClassTypeRegistry::default()));
         let return_lowering = Box::leak(Box::new(ReturnLoweringContext::new(
             custom_types,
             data_types,
+            class_types,
         )));
         let callback_registry = Box::leak(Box::new(CallbackTraitRegistry::default()));
         let on_wire_record_error = Box::leak(Box::new(proc_macro2::TokenStream::new()));

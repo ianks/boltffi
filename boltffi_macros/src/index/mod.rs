@@ -4,10 +4,12 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 pub(crate) mod callback_traits;
+pub(crate) mod class_types;
 pub(crate) mod custom_types;
 pub(crate) mod data_types;
 mod path_resolver;
 mod source_tree;
+pub(crate) mod type_paths;
 
 pub(crate) use path_resolver::PathResolver;
 pub(crate) use source_tree::{ModulePath, SourceModule, SourceTree};
@@ -15,6 +17,7 @@ pub(crate) use source_tree::{ModulePath, SourceModule, SourceTree};
 #[derive(Clone)]
 pub(crate) struct CrateIndex {
     custom_types: custom_types::CustomTypeRegistry,
+    class_types: class_types::ClassTypeRegistry,
     data_types: data_types::DataTypeRegistry,
     callback_traits: callback_traits::CallbackTraitRegistry,
     path_resolver: PathResolver,
@@ -40,6 +43,7 @@ impl CrateIndex {
         let source_modules = source_tree.modules()?;
         let crate_index = Self {
             custom_types: custom_types::build_custom_type_registry(&source_modules)?,
+            class_types: class_types::build_class_type_registry(&source_modules)?,
             data_types: data_types::build_data_type_registry(&source_modules)?,
             callback_traits: callback_traits::build_callback_trait_registry(&source_modules)?,
             path_resolver: PathResolver::build(&source_modules),
@@ -59,6 +63,10 @@ impl CrateIndex {
 
     pub(crate) fn data_types(&self) -> &data_types::DataTypeRegistry {
         &self.data_types
+    }
+
+    pub(crate) fn class_types(&self) -> &class_types::ClassTypeRegistry {
+        &self.class_types
     }
 
     pub(crate) fn callback_traits(&self) -> &callback_traits::CallbackTraitRegistry {

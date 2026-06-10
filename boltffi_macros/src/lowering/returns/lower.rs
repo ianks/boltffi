@@ -136,9 +136,10 @@ impl ResolvedReturn {
                 quote! { <#rust_type as ::boltffi::__private::Passable>::Out }
             }
             ValueReturnStrategy::Buffer(_) => quote! { ::boltffi::__private::FfiBuf },
-            ValueReturnStrategy::ObjectHandle | ValueReturnStrategy::CallbackHandle => {
-                quote! { #rust_type }
+            ValueReturnStrategy::ObjectHandle => {
+                quote! { *mut #rust_type }
             }
+            ValueReturnStrategy::CallbackHandle => quote! { #rust_type },
         }
     }
 
@@ -188,7 +189,11 @@ impl ResolvedReturn {
                     #encode_expression
                 }
             }
-            ValueReturnStrategy::ObjectHandle | ValueReturnStrategy::CallbackHandle => quote! {
+            ValueReturnStrategy::ObjectHandle => quote! {
+                if !out_status.is_null() { *out_status = ::boltffi::__private::FfiStatus::OK; }
+                Box::into_raw(Box::new(result))
+            },
+            ValueReturnStrategy::CallbackHandle => quote! {
                 if !out_status.is_null() { *out_status = ::boltffi::__private::FfiStatus::OK; }
                 result
             },
