@@ -19,6 +19,7 @@ pub enum Target {
     Header,
     Dart,
     Python,
+    Ruby,
     CSharp,
 }
 
@@ -33,6 +34,7 @@ impl Target {
             Target::Header => "header",
             Target::Dart => "dart",
             Target::Python => "python",
+            Target::Ruby => "ruby",
             Target::CSharp => "csharp",
         }
     }
@@ -110,6 +112,8 @@ pub struct TargetsConfig {
     #[serde(default)]
     pub python: PythonConfig,
     #[serde(default)]
+    pub ruby: RubyConfig,
+    #[serde(default)]
     pub csharp: CSharpConfig,
 }
 
@@ -160,6 +164,23 @@ pub struct PythonWheelConfig {
     #[serde(alias = "wheel_output")]
     pub output: Option<PathBuf>,
     pub interpreters: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RubyConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    pub output: Option<PathBuf>,  // default: "dist/ruby"
+    pub gem_name: Option<String>, // default: crate name with - separators
+    /// Future: emit ZJIT leaf-function hints in the C extension.
+    /// Default false until FFX metadata is implemented.
+    #[serde(default)]
+    pub zjit_hints: bool,
+    /// Emit `rb_ext_ractor_safe(true)` in `Init_`, declaring the extension safe
+    /// to call from any Ractor. Opt-in: it asserts the bound Rust crate has no
+    /// unsynchronized global mutable state, which BoltFFI cannot verify.
+    #[serde(default)]
+    pub ractor_safe: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1349,6 +1370,7 @@ impl Config {
             Target::Header => self.is_apple_enabled() || self.is_android_enabled(),
             Target::Dart => self.is_dart_enabled(),
             Target::Python => self.is_python_enabled(),
+            Target::Ruby => self.is_ruby_enabled(),
             Target::CSharp => self.is_csharp_enabled(),
         }
     }
@@ -1484,6 +1506,26 @@ impl Config {
 
     pub fn python_wheel_interpreters(&self) -> Option<&[String]> {
         self.targets.python.wheel.interpreters.as_deref()
+    }
+
+    pub fn is_ruby_enabled(&self) -> bool {
+        self.targets.ruby.enabled
+    }
+
+    pub fn ruby_output(&self) -> PathBuf {
+        self.targets
+            .ruby
+            .output
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("dist/ruby"))
+    }
+
+    pub fn ruby_ractor_safe(&self) -> bool {
+        self.targets.ruby.ractor_safe
+    }
+
+    pub fn ruby_gem_name(&self) -> Option<String> {
+        self.targets.ruby.gem_name.clone()
     }
 
     pub fn csharp_output(&self) -> PathBuf {

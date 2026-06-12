@@ -24,6 +24,7 @@ pub mod jni;
 pub mod kmp;
 pub mod kotlin;
 pub mod python;
+pub mod ruby;
 pub mod swift;
 pub mod typescript;
 

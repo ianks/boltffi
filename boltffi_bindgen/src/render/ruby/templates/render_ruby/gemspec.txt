@@ -1,0 +1,26 @@
+Gem::Specification.new do |spec|
+  spec.name    = "{{ gem_name }}"
+  spec.version = "{{ crate_version }}"
+  spec.summary = "BoltFFI-generated Ruby bindings for {{ crate_name }}"
+  spec.description = "Generated Ruby C-extension bindings for the {{ crate_name }} Rust crate, produced by BoltFFI."
+
+  # Source gem: compiled from source at install, ships no prebuilt binary, so it
+  # installs on any platform with a Rust toolchain. `boltffi pack ruby` produces
+  # the precompiled variant — it vendors a per-arch lib{{ lib_name }}.a and stamps
+  # spec.platform (e.g. arm64-darwin) so RubyGems serves each archive only to a
+  # matching host. A vendored .a with no platform tag would be served everywhere
+  # and fail to link on a mismatched arch.
+  spec.platform = Gem::Platform::RUBY
+
+  spec.files = [
+    "lib/{{ crate_name }}.rb",
+    "ext/{{ crate_name }}/_native.c",
+    "ext/{{ crate_name }}/extconf.rb",
+  ]
+
+  spec.extensions = ["ext/{{ crate_name }}/extconf.rb"]
+
+  spec.required_ruby_version     = ">= 3.1"
+  spec.required_rubygems_version = ">= 3.0"
+  spec.metadata = { "rubygems_mfa_required" => "true" }
+end
